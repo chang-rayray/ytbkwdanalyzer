@@ -417,6 +417,22 @@ tbody tr:hover {
     background: linear-gradient(135deg, #10b981, #059669);
 }
 
+.ai-header {
+    gap: 12px;
+}
+
+.ai-header h3 {
+    margin-right: auto;
+}
+
+#ai-provider-select {
+    width: auto;
+    padding: 6px 32px 6px 12px;
+    font-size: 0.85rem;
+    background-position: right 10px center;
+    background-size: 12px;
+}
+
 .ai-content {
     font-size: 0.95rem;
     line-height: 1.6;

@@ -1,13 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Elements
-    const apiKeyInput = document.getElementById('api-key-input');
-    const aiProvider = document.getElementById('ai-provider');
-    const geminiKeyInput = document.getElementById('gemini-key-input');
-    const openaiKeyInput = document.getElementById('openai-key-input');
-    const geminiKeyGroup = document.getElementById('gemini-key-group');
-    const openaiKeyGroup = document.getElementById('openai-key-group');
-    const saveApiKeyBtn = document.getElementById('save-api-key-btn');
-    const apiKeyStatus = document.getElementById('api-key-status');
+    const aiProviderSelect = document.getElementById('ai-provider-select');
     const searchInput = document.getElementById('search-input');
     const searchBtn = document.getElementById('search-btn');
     const searchStatus = document.getElementById('search-status');
@@ -25,71 +18,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiBadge = document.getElementById('ai-badge');
     const aiLoader = document.querySelector('.ai-loader');
     const aiText = document.getElementById('ai-text');
+    const runAiBtn = document.getElementById('run-ai-btn');
 
     let currentResults = [];
+    let lastQuery = '';
 
-    // Load API Keys on startup
-    const savedApiKey = localStorage.getItem('youtube_api_key');
-    if (savedApiKey) {
-        apiKeyInput.value = savedApiKey;
-    }
-    const savedProvider = localStorage.getItem('ai_provider');
-    if (savedProvider) {
-        aiProvider.value = savedProvider;
-    }
-    const savedGeminiKey = localStorage.getItem('gemini_api_key');
-    if (savedGeminiKey) {
-        geminiKeyInput.value = savedGeminiKey;
-    }
-    const savedOpenaiKey = localStorage.getItem('openai_api_key');
-    if (savedOpenaiKey) {
-        openaiKeyInput.value = savedOpenaiKey;
+    // API keys and AI provider are supplied by /api/config, generated from environment variables.
+    const APP_CONFIG = window.APP_CONFIG || {};
+    if (aiProviderSelect) aiProviderSelect.value = APP_CONFIG.aiProvider || 'gemini';
+
+    function getSelectedProvider() {
+        return aiProviderSelect ? aiProviderSelect.value : (APP_CONFIG.aiProvider || 'gemini');
     }
 
-    // Toggle API key inputs based on provider
-    const toggleProviderInputs = () => {
-        if (aiProvider.value === 'openai') {
-            geminiKeyGroup.style.display = 'none';
-            openaiKeyGroup.style.display = 'flex';
-        } else {
-            geminiKeyGroup.style.display = 'flex';
-            openaiKeyGroup.style.display = 'none';
-        }
-    };
-    aiProvider.addEventListener('change', toggleProviderInputs);
-    toggleProviderInputs();
+    function getKeyForProvider(provider) {
+        return provider === 'openai' ? (APP_CONFIG.openaiApiKey || '') : (APP_CONFIG.geminiApiKey || '');
+    }
 
-    // Save API Key
-    saveApiKeyBtn.addEventListener('click', () => {
-        const key = apiKeyInput.value.trim();
-        const provider = aiProvider.value;
-        const geminiKey = geminiKeyInput.value.trim();
-        const openaiKey = openaiKeyInput.value.trim();
-
-        if (key) {
-            localStorage.setItem('youtube_api_key', key);
-        } else {
-            localStorage.removeItem('youtube_api_key');
-        }
-
-        localStorage.setItem('ai_provider', provider);
-
-        if (geminiKey) {
-            localStorage.setItem('gemini_api_key', geminiKey);
-        } else {
-            localStorage.removeItem('gemini_api_key');
-        }
-
-        if (openaiKey) {
-            localStorage.setItem('openai_api_key', openaiKey);
-        } else {
-            localStorage.removeItem('openai_api_key');
-        }
-
-        apiKeyStatus.textContent = '설정이 저장되었습니다.';
-        apiKeyStatus.className = 'status-message status-success';
-        setTimeout(() => { apiKeyStatus.textContent = ''; }, 3000);
-    });
+    if (runAiBtn) {
+        runAiBtn.addEventListener('click', () => {
+            if (currentResults.length === 0) return;
+            const provider = getSelectedProvider();
+            const aiKey = getKeyForProvider(provider);
+            if (aiKey) {
+                runAIAnalysis(lastQuery, aiKey, provider);
+            } else {
+                aiBadge.textContent = provider === 'openai' ? 'OpenAI' : 'Gemini';
+                aiBadge.className = provider === 'openai' ? 'ai-badge openai' : 'ai-badge';
+                aiText.innerHTML = `<span class="optional">${provider === 'openai' ? 'OpenAI' : 'Gemini'} API 키를 설정하면 AI 전략 분석을 볼 수 있습니다.</span>`;
+                aiLoader.style.display = 'none';
+            }
+        });
+    }
 
     // Helper to format numbers
     const formatNumber = (num) => {
@@ -97,10 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
         return parseInt(num, 10).toLocaleString('ko-KR');
     };
 
-    // Search
-    searchBtn.addEventListener('click', async () => {
+searchBtn.addEventListener('click', async () => {
         const query = searchInput.value.trim();
-        const apiKey = apiKeyInput.value.trim();
+        const apiKey=APP_CONFIG.youtubeApiKey||'';
 
         if (!apiKey) {
             alert('YouTube API 키를 먼저 설정해주세요.');
@@ -197,19 +156,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 8. Analyze Dashboard
             analyzeKeywordData(query);
+            lastQuery = query;
 
-            // 9. AI Analysis
-            const provider = aiProvider.value;
-            const aiKey = provider === 'openai' ? openaiKeyInput.value.trim() : geminiKeyInput.value.trim();
-            if (aiKey) {
-                runAIAnalysis(query, aiKey, provider);
-            } else {
-                aiAnalysisContainer.style.display = 'block';
-                aiBadge.textContent = provider === 'openai' ? 'OpenAI' : 'Gemini';
-                aiBadge.className = provider === 'openai' ? 'ai-badge openai' : 'ai-badge';
-                aiText.innerHTML = `<span class="optional">${provider === 'openai' ? 'OpenAI' : 'Gemini'} API 키를 설정하면 AI 전략 분석을 볼 수 있습니다.</span>`;
-                aiLoader.style.display = 'none';
-            }
+            // 9. AI Analysis panel (manual trigger via dropdown + button)
+            const provider = getSelectedProvider();
+            aiAnalysisContainer.style.display = 'block';
+            aiBadge.textContent = provider === 'openai' ? 'OpenAI' : 'Gemini';
+            aiBadge.className = provider === 'openai' ? 'ai-badge openai' : 'ai-badge';
+            aiLoader.style.display = 'none';
+            aiText.innerHTML = '<span class="optional">AI 모델을 선택하고 "AI 분석 실행" 버튼을 눌러주세요.</span>';
 
         } catch (error) {
             console.error(error);
